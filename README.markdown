@@ -28,4 +28,4 @@ Quick start
 Dependencies
 ------------
 
-* [Django 1.5.1](https://pypi.python.org/pypi/Django/1.5.1)
+* [Django 1.5.4](https://pypi.python.org/pypi/Django/1.5.4)

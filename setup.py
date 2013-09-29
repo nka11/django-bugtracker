@@ -6,7 +6,7 @@ README = open(os.path.join(os.path.dirname(__file__), 'README.markdown')).read()
 
 setup(
     name = 'django-bugtracker',
-    version = '1.0.0',
+    version = '1.0.1',
     packages = ['bugtracker'],
     include_package_data = True,
     license = 'BSD License',
@@ -28,6 +28,6 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
     ],
     install_requires=[
-		'Django==1.5.1',
+		'Django==1.5.4',
     ],
 )
