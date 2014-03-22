@@ -1,17 +1,16 @@
 import os
 from setuptools import setup
 
-README = open(os.path.join(os.path.dirname(__file__), 'README.markdown')).read()
-
+long_description = open(os.path.join(os.path.dirname(__file__), 'README.rst')).read()
 
 setup(
     name = 'django-bugtracker',
-    version = '1.0.2',
+    version = '1.0.0',
     packages = ['bugtracker'],
     include_package_data = True,
     license = 'BSD License',
     description = 'A simple Django admin-based bug tracker.',
-    long_description = README,
+    long_description = long_description,
     url = 'https://github.com/ahernp/django-bugtracker',
     author = 'Paul Ahern',
     author_email = 'ahernp@ahernp.com',
@@ -28,6 +27,6 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
     ],
     install_requires=[
-		'Django>=1.5.4',
+		'Django==1.6.2',
     ],
 )
