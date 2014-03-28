@@ -1,6 +1,6 @@
 """Models used to store tickets."""
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
 
 STATUSES = (('I', 'Initial'),
             ('A', 'Awaiting Update'),
@@ -20,8 +20,8 @@ class Ticket(models.Model):
     priority = models.CharField(max_length=1, choices=PRIORITIES)
     created_time = models.DateTimeField(auto_now_add=True)
     updated_time = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, related_name='+')
-    assigned_to = models.ForeignKey(User, related_name='+')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='+')
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='+')
 
     class Meta:
         ordering = ['-updated_time']
@@ -36,7 +36,7 @@ class TicketUpdate(models.Model):
     update_text = models.TextField()
     attachment = models.FileField(upload_to='bugtracker', blank=True, null=True)
     updated_time = models.DateTimeField(auto_now=True)
-    updated_by = models.ForeignKey(User, related_name='+')
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='+')
 
     class Meta:
         ordering = ['-updated_time']
