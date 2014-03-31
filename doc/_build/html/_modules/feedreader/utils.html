@@ -1,0 +1,282 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>feedreader.utils &mdash; django-feedreader 0.9.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.9.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="django-feedreader 0.9.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">django-feedreader 0.9.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for feedreader.utils</h1><div class="highlight"><pre>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">absolute_import</span>
+
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">mktime</span>
+
+<span class="kn">import</span> <span class="nn">feedparser</span>
+<span class="kn">import</span> <span class="nn">pytz</span>
+
+<span class="kn">from</span> <span class="nn">django.conf</span> <span class="kn">import</span> <span class="n">settings</span>
+<span class="kn">from</span> <span class="nn">django.utils</span> <span class="kn">import</span> <span class="n">html</span>
+<span class="kn">from</span> <span class="nn">django.utils</span> <span class="kn">import</span> <span class="n">timezone</span>
+
+<span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">Entry</span><span class="p">,</span> <span class="n">Options</span><span class="p">,</span> <span class="n">Group</span><span class="p">,</span> <span class="n">Feed</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s">&#39;feedreader&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="build_context"><a class="viewcode-back" href="../../code.html#feedreader.utils.build_context">[docs]</a><span class="k">def</span> <span class="nf">build_context</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="p">{}):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Find flag and id values in the request and use them</span>
+<span class="sd">    to build a common context dictionary. Including the </span>
+<span class="sd">    list of entries to display.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+
+    <span class="n">options</span> <span class="o">=</span> <span class="n">Options</span><span class="o">.</span><span class="n">get_options</span><span class="o">.</span><span class="n">get_options</span><span class="p">()</span>
+    <span class="n">poll_flag</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">GET</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;poll_flag&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="n">mark_read_flag</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">GET</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;mark_read_flag&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="n">show_read_flag</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">GET</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;show_read_flag&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="n">last_entry</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">last_entry_id</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">GET</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;entry_id&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>  <span class="c"># Last entry on page</span>
+    <span class="k">if</span> <span class="n">last_entry_id</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">last_entry</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">last_entry_id</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">Entry</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+    <span class="n">context</span><span class="p">[</span><span class="s">&#39;show_read_flag&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">show_read_flag</span>
+    <span class="n">feed</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">feed_id</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">GET</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;feed_id&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">feed_id</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">feed</span> <span class="o">=</span> <span class="n">Feed</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">feed_id</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">Feed</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+    <span class="n">group</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="n">group_id</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">GET</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;group_id&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">group_id</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">group</span> <span class="o">=</span> <span class="n">Group</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">group_id</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">Group</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+    <span class="k">if</span> <span class="n">feed</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">mark_read_flag</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">feed</span><span class="o">=</span><span class="n">feed</span><span class="p">,</span> <span class="n">read_flag</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+            <span class="n">entries</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">read_flag</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">poll_flag</span><span class="p">:</span>
+            <span class="n">poll_feed</span><span class="p">(</span><span class="n">feed</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">show_read_flag</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">feed</span><span class="o">=</span><span class="n">feed</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">feed</span><span class="o">=</span><span class="n">feed</span><span class="p">,</span> <span class="n">read_flag</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="n">context</span><span class="p">[</span><span class="s">&#39;entries_header&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">feed</span><span class="o">.</span><span class="n">title</span>
+    <span class="k">elif</span> <span class="n">group</span><span class="p">:</span>
+        <span class="n">feeds</span> <span class="o">=</span> <span class="n">Feed</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mark_read_flag</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">feed__group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span> <span class="n">read_flag</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+            <span class="n">entries</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">read_flag</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">poll_flag</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">feed</span> <span class="ow">in</span> <span class="n">feeds</span><span class="p">:</span>
+                <span class="n">poll_feed</span><span class="p">(</span><span class="n">feed</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">show_read_flag</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">feed__group</span><span class="o">=</span><span class="n">group</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">feed__group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span> <span class="n">read_flag</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="n">context</span><span class="p">[</span><span class="s">&#39;entries_header&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">name</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">mark_read_flag</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">read_flag</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+            <span class="n">entries</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">read_flag</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">show_read_flag</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">entries</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">read_flag</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="n">context</span><span class="p">[</span><span class="s">&#39;entries_header&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;All items&#39;</span>
+
+    <span class="k">if</span> <span class="n">last_entry</span><span class="p">:</span>
+        <span class="n">entry_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">entries</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">last_entry</span> <span class="ow">in</span> <span class="n">entry_list</span><span class="p">:</span>
+            <span class="n">last_entry_pos</span> <span class="o">=</span> <span class="n">entry_list</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">last_entry</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">last_entry_pos</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">entry_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">read_flag</span> <span class="o">==</span> <span class="bp">False</span><span class="p">:</span>
+                    <span class="n">entry_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">read_flag</span> <span class="o">=</span> <span class="bp">True</span>
+                    <span class="n">entry_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">del</span> <span class="n">entry_list</span><span class="p">[:</span><span class="n">last_entry_pos</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">context</span><span class="p">[</span><span class="s">&#39;entry_list&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">entry_list</span><span class="p">[:</span><span class="n">options</span><span class="o">.</span><span class="n">number_additionally_displayed</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">context</span><span class="p">[</span><span class="s">&#39;entry_list&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">context</span><span class="p">[</span><span class="s">&#39;entries_header&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">context</span><span class="p">[</span><span class="s">&#39;entry_list&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">entries</span><span class="p">[:</span><span class="n">options</span><span class="o">.</span><span class="n">number_initially_displayed</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">context</span>
+
+</div>
+<div class="viewcode-block" id="poll_feed"><a class="viewcode-back" href="../../code.html#feedreader.utils.poll_feed">[docs]</a><span class="k">def</span> <span class="nf">poll_feed</span><span class="p">(</span><span class="n">db_feed</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Read through a feed looking for new entries.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">options</span> <span class="o">=</span> <span class="n">Options</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">options</span><span class="p">:</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c"># Create options row with default values</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="n">Options</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">()</span>
+    <span class="n">parsed</span> <span class="o">=</span> <span class="n">feedparser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">db_feed</span><span class="o">.</span><span class="n">xml_url</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="p">,</span> <span class="s">&#39;bozo_exception&#39;</span><span class="p">):</span>
+        <span class="c"># Malformed feed</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s">&#39;Feedreader poll_feeds found Malformed feed, </span><span class="si">%s</span><span class="s">: </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">db_feed</span><span class="o">.</span><span class="n">xml_url</span><span class="p">,</span> <span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">bozo_exception</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="p">,</span> <span class="s">&#39;published_parsed&#39;</span><span class="p">):</span>
+        <span class="n">published_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">mktime</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">published_parsed</span><span class="p">))</span>
+        <span class="n">published_time</span> <span class="o">=</span> <span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TIME_ZONE</span><span class="p">)</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">published_time</span><span class="p">,</span> <span class="n">is_dst</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">db_feed</span><span class="o">.</span><span class="n">published_time</span> <span class="ow">and</span> <span class="n">db_feed</span><span class="o">.</span><span class="n">published_time</span> <span class="o">&gt;=</span> <span class="n">published_time</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">db_feed</span><span class="o">.</span><span class="n">published_time</span> <span class="o">=</span> <span class="n">published_time</span>
+    <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;title_detail&#39;</span><span class="p">,</span> <span class="s">&#39;link&#39;</span><span class="p">,</span> <span class="s">&#39;description&#39;</span><span class="p">,</span> <span class="s">&#39;description_detail&#39;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s">&#39;Feedreader poll_feeds. Feed &quot;</span><span class="si">%s</span><span class="s">&quot; has no </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">db_feed</span><span class="o">.</span><span class="n">xml_url</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                <span class="k">print</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">return</span>
+    <span class="k">if</span> <span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">title_detail</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s">&#39;text/plain&#39;</span><span class="p">:</span>
+        <span class="n">db_feed</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">escape</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">title</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">db_feed</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">title</span>
+    <span class="n">db_feed</span><span class="o">.</span><span class="n">link</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">link</span>
+    <span class="k">if</span> <span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">description_detail</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s">&#39;text/plain&#39;</span><span class="p">:</span>
+        <span class="n">db_feed</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">escape</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">description</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">db_feed</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">feed</span><span class="o">.</span><span class="n">description</span>
+    <span class="n">db_feed</span><span class="o">.</span><span class="n">last_polled_time</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">db_feed</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%d</span><span class="s"> entries to process in </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">entries</span><span class="p">),</span> <span class="n">db_feed</span><span class="o">.</span><span class="n">title</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">entry</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">parsed</span><span class="o">.</span><span class="n">entries</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="n">options</span><span class="o">.</span><span class="n">max_entries_saved</span><span class="p">:</span>
+            <span class="k">break</span>
+        <span class="n">missing_attr</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;title&#39;</span><span class="p">,</span> <span class="s">&#39;title_detail&#39;</span><span class="p">,</span> <span class="s">&#39;link&#39;</span><span class="p">,</span> <span class="s">&#39;description&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s">&#39;Feedreader poll_feeds. Entry &quot;</span><span class="si">%s</span><span class="s">&quot; has no </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">link</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                    <span class="k">print</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                <span class="n">missing_attr</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">if</span> <span class="n">missing_attr</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">title</span> <span class="o">==</span> <span class="s">&quot;&quot;</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s">&#39;Feedreader poll_feeds. Entry &quot;</span><span class="si">%s</span><span class="s">&quot; has a blank title&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">link</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                <span class="k">print</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="n">db_entry</span><span class="p">,</span> <span class="n">created</span> <span class="o">=</span> <span class="n">Entry</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="n">feed</span><span class="o">=</span><span class="n">db_feed</span><span class="p">,</span> <span class="n">link</span><span class="o">=</span><span class="n">entry</span><span class="o">.</span><span class="n">link</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">created</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="s">&#39;published_parsed&#39;</span><span class="p">):</span>
+                <span class="n">published_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">mktime</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">published_parsed</span><span class="p">))</span>
+                <span class="n">published_time</span> <span class="o">=</span> <span class="n">pytz</span><span class="o">.</span><span class="n">timezone</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TIME_ZONE</span><span class="p">)</span><span class="o">.</span><span class="n">localize</span><span class="p">(</span><span class="n">published_time</span><span class="p">,</span> <span class="n">is_dst</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+                <span class="n">now</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">published_time</span> <span class="o">&gt;</span> <span class="n">now</span><span class="p">:</span>
+                    <span class="n">published_time</span> <span class="o">=</span> <span class="n">now</span>
+                <span class="n">db_entry</span><span class="o">.</span><span class="n">published_time</span> <span class="o">=</span> <span class="n">published_time</span>
+            <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">title_detail</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s">&#39;text/plain&#39;</span><span class="p">:</span>
+                <span class="n">db_entry</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">escape</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">title</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">db_entry</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">title</span>
+            <span class="c"># Lots of entries are missing descrtion_detail attributes. Escape their content by default</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="s">&#39;description_detail&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">entry</span><span class="o">.</span><span class="n">description_detail</span><span class="o">.</span><span class="n">type</span> <span class="o">!=</span> <span class="s">&#39;text/plain&#39;</span><span class="p">:</span>
+                <span class="n">db_entry</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">description</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">db_entry</span><span class="o">.</span><span class="n">description</span> <span class="o">=</span> <span class="n">html</span><span class="o">.</span><span class="n">escape</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">description</span><span class="p">)</span>
+            <span class="n">db_entry</span><span class="o">.</span><span class="n">save</span><span class="p">()</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">django-feedreader 0.9.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2014, Paul Ahern.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.1.
+    </div>
+  </body>
+</html>
