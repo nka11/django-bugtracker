@@ -24,10 +24,6 @@ sys.path.append(parent)
 
 import bugtracker
 
-# Add path to project settings file to allow autodoc to work
-sys.path.append('/home/ahernp/code/django-ahernp/ahernp')
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ahernp.settings.production")
-
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
