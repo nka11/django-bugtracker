@@ -39,7 +39,7 @@ class TicketAdmin(admin.ModelAdmin):
             for instance in instances:
                 instance.updated_by = request.user
                 instance.save()
-        else:
-            formset.save()
+#         else:
+#             formset.save()
 
 admin.site.register(Ticket, TicketAdmin)

@@ -42,4 +42,4 @@ class TicketUpdate(models.Model):
         ordering = ['-updated_time']
 
     def __unicode__(self):
-        return self.title
+        return '%s-update-%s' % (self.ticket.title, self.ticket.id)
