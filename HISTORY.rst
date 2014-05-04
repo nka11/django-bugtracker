@@ -3,6 +3,11 @@
 History
 -------
 
+1.0.4 (2014-05-04)
+++++++++++++++++++
+
+* Refined unit tests to work with postgres database.
+
 1.0.3 (2014-04-30)
 ++++++++++++++++++
 

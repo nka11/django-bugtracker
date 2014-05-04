@@ -29,8 +29,8 @@ class SaveTicketTest(TestCase):
                                      'description': 'Created via Admin url',
                                      'status': 'I',
                                      'priority': 'L',
-                                     'created_by': '1',
-                                     'assigned_to': '1',
+                                     'created_by': self.user.id,
+                                     'assigned_to': self.user.id,
                                      'ticketupdate_set-0-attachment': '',
                                      'ticketupdate_set-__prefix__-update_text': '',
                                      'ticketupdate_set-INITIAL_FORMS': '0',
@@ -43,7 +43,6 @@ class SaveTicketTest(TestCase):
                                      'ticketupdate_set-__prefix__-id': '',
                                      'ticketupdate_set-__prefix__-attachment': '',
                                      })
-
         self.assertEqual(response.status_code,
                          302,
                          'Unexpected status code on add, got %s expected 302' %
